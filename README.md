@@ -12,22 +12,7 @@
 
 - *仅根据cname或ip范围判断cdn，cname与ip范围不全导致遗漏*
 
-- *输出字段较多，不方便直接与其他工具结合*
-
-
-
-同时受到https://github.com/projectdiscovery/ 很多工具的启发，本工具的设计目标就是仅做cdn识别这一项功能，同时可以仅输出未使用cdn的ip，便于直接与其他工具联动，比如 https://github.com/projectdiscovery/mapcidr ，方便直接生成目标ip段
-
-
-
-## 安装
-
-```
-git clone https://github.com/alwaystest18/cdnChecker.git
-cd cdnChecker/
-go install
-go build cdnChecker.go
-```
+- *输出字段较多，不方便直接与其他工具结合*i
 
 
 
@@ -43,34 +28,101 @@ Usage of ./cdnChecker:
         cdn cname file (default "cdn_cname")
   -df string         //域名列表文件，注意为host部分，不要带http://
         domain list file
-  -o string         //未使用cdn域名输出文件，如果不指定生成在同目录no_cdn_domains+时间.txt
-        output domains that are not using cdn to file (default "no_cdn_domains202304040755.txt")
-  -oc string     //使用cdn域名输出文件，如果不指定生成在同目录use_cdn_domains+时间.txt
-        output domains that are using cdn to file (default "use_cdn_domains202304040755.txt")
-  -od string     //域名:ip的格式，便于根据ip反查域名，如果不指定生成在同目录domain_info+时间.txt
-        output domain info(domain:ip) to file (default "domain_info202304122222.txt")
-  -oi string    //未使用cdn的ip输出文件，如果不指定生成在同目录no_cdn_ips+时间.txt
-        output ips that are not using cdn to file (default "no_cdn_ips202304040755.txt")
   -r string       //dns服务器列表文件
         dns resolvers file
 ```
 
-单独使用
+### 单独使用
+__*不建议单独使用，这个 fork 修改版是为了满足服务器 pipeline 使用的*__
+```
+$ cat /tmp/1
+www.baidu.com
+www.qq.com
+www.alibabagroup.com
+aurora.tencent.com
+$ cat /tmp/1 | go run cdnChecker.go -df -  
+{"Domain":"www.baidu.com","Ip":["182.61.200.7","182.61.200.6"],"Cdn":true,"Cname":["www.a.shifen.com"]}
+{"Domain":"aurora.tencent.com","Ip":["43.137.23.148"],"Cdn":false,"Cname":null}
+{"Domain":"www.alibabagroup.com","Ip":["43.243.246.103","43.243.246.100","43.243.246.106","43.243.246.101","43.243.246.104","43.243.246.102","43.243.246.105","43.243.246.107"],"Cdn":true,"Cname":["www.alibabagroup.com.w.cdngslb.com"]}
+{"Domain":"www.qq.com","Ip":["109.244.211.100","109.244.211.81"],"Cdn":false,"Cname":["ins-r23tsuuf.ias.tencent-cloud.net"]}
+```
+
+### pipeline
 
 ```
-$ cat domains.txt 
-www.baidu.com        //使用cdn
-www.qq.com         //使用cdn
-www.alibabagroup.com    //使用cdn
-aurora.tencent.com     //未使用cdn
-$ ./cdnChecker -df domains.txt -cf cdn_cname -r resolvers.txt 
-43.137.23.148
+root@nmmd:/whereris/#  cat /tmp/1 | ./cdnChecker -df -   | jq -c 'select(.Cdn==false)' | jq -r  .Domain | ./yscan -ip - -port 8080,443,80 -mode 1 -json ./result.json
+INFO[0000] Loading technologies default
+SYNSCAINING 100% |████████████████████████████████████████| (78/78, 78 it/s)INFO[0019] 49.234.124.95 443 https Matched  [Nginx PHP]
+SYN-TCPSCAINING  21% |████████                                | (3/14, 33 it/min) [2s:19s]INFO[0019] 42.192.184.173 443 https Matched DayBreak [Nginx]
+SYN-TCPSCAINING  28% |███████████                             | (4/14, 33 it/min) [2s:18s]INFO[0019] 182.254.150.199 443 https Matched 登录中心 [Bootstrap PHP jQuery Nginx]
+SYN-TCPSCAINING  35% |██████████████                          | (5/14, 33 it/min) [2s:16s]INFO[0020] 106.75.231.100 443 https Matched  [Nuxt.js Nginx Node.js Vue.js]
+SYN-TCPSCAINING  42% |█████████████████                       | (6/14, 3 it/s) [2s:2s]INFO[0020] 39.105.209.249 443 https Matched 404 Not Found []
+SYN-TCPSCAINING  50% |████████████████████                    | (7/14, 3 it/s) [3s:2s]INFO[0021] 182.254.150.199 80 http Matched 403 Forbidden [Nginx]
+SYN-TCPSCAINING  57% |██████████████████████                  | (8/14, 3 it/s) [3s:2s]INFO[0021] 117.50.12.71 80 http Matched 403 Forbidden [Nginx]
+SYN-TCPSCAINING  64% |█████████████████████████               | (9/14, 3 it/s) [3s:1s]INFO[0021] 42.192.184.173 80 http Matched 403 Forbidden [Nginx]
+SYN-TCPSCAINING  71% |████████████████████████████            | (10/14, 3 it/s) [3s:1s]INFO[0021] 49.234.124.95 80 http Matched Welcome to CentOS [Nginx]
+SYN-TCPSCAINING  78% |███████████████████████████████         | (11/14, 3 it/s) [3s:1s]INFO[0021] 106.75.231.100 80 http Matched  [Vue.js Nuxt.js Nginx Node.js]
+SYN-TCPSCAINING  85% |██████████████████████████████████      | (12/14, 4 it/s) [4s:0s]INFO[0022] 39.105.209.249 80 http Matched 404 Not Found []
+SYN-TCPSCAINING  92% |█████████████████████████████████████   | (13/14, 3 it/s) [4s:0s]INFO[0023] 124.70.145.246 80 http Matched APTP-Discovery [Nginx]
+SYN-TCPSCAINING 100% |████████████████████████████████████████| (14/14, 2 it/s)INFO[0025] company.tophant.com 443 https Matched 404 Not Found [Nginx]
+INFO[0026] account.tophant.com 443 https Matched 登录中心 [Nginx Bootstrap PHP jQuery]
+INFO[0026] api.tophant.com 443 https Matched  [Nginx PHP]
+INFO[0026] daybreak.tophant.com 443 https Matched DayBreak [Nginx]
+INFO[0026] tophant.com 443 https Matched 斗象科技 - 网络安全数据分析与安全运营提供商 [Font Awesome Nginx]
+INFO[0026] www.tophant.com 443 https Matched 斗象科技 - 网络安全数据分析与安全运营提供商 [Font Awesome Nginx]
+INFO[0026] vip.tophant.com 443 https Matched 漏洞情报中心 [Vue.js Nuxt.js Nginx Node.js]
+INFO[0026] pay.tophant.com 443 https Matched  []
+INFO[0028] api.tophant.com 80 http Matched Welcome to CentOS [Nginx]
+INFO[0028] company.tophant.com 80 http Matched 404 Not Found [Nginx]
+INFO[0028] pay.tophant.com 80 http Matched  []
+INFO[0028] tophant.com 80 http Matched 斗象科技 - 网络安全数据分析与安全运营提供商 [Font Awesome Nginx]
+INFO[0028] account.tophant.com 80 http Matched 登录中心 [Bootstrap PHP jQuery Nginx]
+INFO[0028] daybreak.tophant.com 80 http Matched DayBreak [Nginx]
+INFO[0028] www.tophant.com 80 http Matched 斗象科技 - 网络安全数据分析与安全运营提供商 [Font Awesome Nginx]
+INFO[0029] vip.tophant.com 80 http Matched 漏洞情报中心 [Nuxt.js Nginx Vue.js Node.js]
+INFO[0029] discovery.tophant.com 80 http Matched APTP-Discovery [Nginx]
+INFO[0031] crs.tophant.com 80 http Matched 斗象智能安全 - 全息安全智能驱动 [Nginx]
+INFO[0031] 31.248616064s
+
+
+root@nmmd:/whereris# cat result.json | jq .[].title
+null
+"DayBreak"
+"登录中心"
+null
+"404 Not Found"
+"403 Forbidden"
+"403 Forbidden"
+"403 Forbidden"
+"Welcome to CentOS"
+null
+"404 Not Found"
+"APTP-Discovery"
+"404 Not Found"
+"登录中心"
+null
+"DayBreak"
+"斗象科技 - 网络安全数据分析与安全运营提供商"
+"斗象科技 - 网络安全数据分析与安全运营提供商"
+"漏洞情报中心"
+null
+"Welcome to CentOS"
+"404 Not Found"
+null
+"斗象科技 - 网络安全数据分析与安全运营提供商"
+"登录中心"
+"DayBreak"
+"斗象科技 - 网络安全数据分析与安全运营提供商"
+"漏洞情报中心"
+"APTP-Discovery"
+"斗象智能安全 - 全息安全智能驱动"
 ```
+
 
 结合[mapcidr](https://github.com/projectdiscovery/mapcidr ) 可直接生成ip段
 
 ```
-$./cdnChecker -df domains.txt -cf cdn_cname -r resolvers.txt | mapcidr -aggregate-approx -silent
+$./cdnChecker -df domains.txt -cf cdn_cname -r resolvers.txt | jq -c 'select(.Cdn==false)' | jq -r  .Ip[] | sort | uniq  | mapcidr -aggregate-approx -silent
 43.137.23.148/32
 ```
 
